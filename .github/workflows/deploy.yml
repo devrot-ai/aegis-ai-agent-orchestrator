@@ -1,0 +1,57 @@
+name: Deploy Aegis to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        path: aegis
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: |
+        cd aegis/dashboard
+        npm ci
+    
+    - name: Build dashboard
+      run: |
+        cd aegis/dashboard
+        npm run build
+    
+    - name: Copy backend files
+      run: |
+        mkdir -p aegis/dist/static
+        cp -r aegis/dashboard/dist/* aegis/dist/
+        cp aegis/core/main.py aegis/dist/
+        cp aegis/core/requirements.txt aegis/dist/
+        cp aegis/core/__init__.py aegis/dist/
+    
+    - name: Setup Pages
+      uses: actions/configure-pages@v4
+    
+    - name: Upload artifact
+      uses: actions/upload-pages-artifact@v3
+      with:
+        path: aegis/dist
+    
+    - name: Deploy to GitHub Pages
+      uses: actions/deploy-pages@v4
