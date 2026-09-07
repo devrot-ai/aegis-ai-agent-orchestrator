@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aegis AI Agent Orchestrator - Live Control Console</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <style>
+        #network {
+            width: 100%;
+            height: 500px;
+            background-color: #0f172a;
+            border-radius: 0.5rem;
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 font-sans min-h-screen p-6">
+    <div class="max-w-7xl mx-auto space-y-6">
+        <!-- Header -->
+        <header class="flex justify-between items-center border-b border-slate-800 pb-4">
+            <div>
+                <h1 class="text-3xl font-bold text-indigo-400">🛡️ Aegis Orchestrator</h1>
+                <p class="text-sm text-slate-400">Distributed Multi-Agent Task Execution & Self-Healing Console</p>
+            </div>
+            <div class="flex items-center space-x-3">
+                <span id="status-badge" class="px-3 py-1 bg-red-900/50 text-red-400 text-xs font-semibold rounded-full border border-red-700">
+                    Disconnected
+                </span>
+                <button onclick="connectWebSocket()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm font-medium transition">
+                    Connect Telemetry
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Layout -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Graph Visualizer -->
+            <div class="lg:col-span-2 bg-slate-800 p-4 rounded-xl border border-slate-700 space-y-3">
+                <div class="flex justify-between items-center">
+                    <h2 class="text-lg font-semibold text-slate-200">Execution DAG Graph</h2>
+                    <span class="text-xs text-slate-400">Real-time Vis.js Network Topology</span>
+                </div>
+                <div id="network"></div>
+            </div>
+
+            <!-- Controls & Logs -->
+            <div class="space-y-6">
+                <!-- Control Card -->
+                <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 space-y-3">
+                    <h2 class="text-lg font-semibold text-slate-200">Trigger Sample Workflow</h2>
+                    <p class="text-xs text-slate-400">Submits a multi-node research DAG to the Aegis engine.</p>
+                    <button onclick="submitSampleWorkflow()" class="w-full py-2 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-sm font-semibold transition">
+                        ⚡ Run "Gotham Investigation" DAG
+                    </button>
+                </div>
+
+                <!-- Event Telemetry Log -->
+                <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 space-y-3">
+                    <h2 class="text-lg font-semibold text-slate-200">Live Event Feed</h2>
+                    <div id="log-feed" class="h-64 overflow-y-auto font-mono text-xs p-3 bg-slate-950 rounded-lg space-y-1 border border-slate-900 text-slate-300">
+                        <div class="text-slate-500">[System] Initialized. Waiting for telemetry connection...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let ws;
+        let network;
+        let nodesDataset = new vis.DataSet([]);
+        let edgesDataset = new vis.DataSet([]);
+
+        function initNetwork() {
+            const container = document.getElementById('network');
+            const data = { nodes: nodesDataset, edges: edgesDataset };
+            const options = {
+                nodes: {
+                    shape: 'box',
+                    font: { color: '#ffffff', face: 'monospace' },
+                    color: { background: '#1e293b', border: '#475569' }
+                },
+                edges: {
+                    arrows: 'to',
+                    color: { color: '#64748b' }
+                },
+                physics: {
+                    hierarchicalRepulsion: { nodeDistance: 120 },
+                    solver: 'hierarchicalRepulsion'
+                },
+                layout: {
+                    hierarchical: { direction: 'LR', sortMethod: 'directed' }
+                }
+            };
+            network = new vis.Network(container, data, options);
+        }
+
+        function connectWebSocket() {
+            ws = new WebSocket('ws://localhost:8000/ws/telemetry');
+
+            ws.onopen = () => {
+                const badge = document.getElementById('status-badge');
+                badge.className = 'px-3 py-1 bg-emerald-900/50 text-emerald-400 text-xs font-semibold rounded-full border border-emerald-700';
+                badge.innerText = 'Live Telemetry Active';
+                logEvent('System', 'Connected to WebSocket server.');
+            };
+
+            ws.onmessage = (event) => {
+                const message = JSON.parse(event.data);
+                logEvent(message.event, JSON.stringify(message.data));
+                
+                if (message.event === 'TASK_STATUS') {
+                    updateNodeStatus(message.data.task_id, message.data.status);
+                }
+            };
+
+            ws.onclose = () => {
+                const badge = document.getElementById('status-badge');
+                badge.className = 'px-3 py-1 bg-red-900/50 text-red-400 text-xs font-semibold rounded-full border border-red-700';
+                badge.innerText = 'Disconnected';
+                logEvent('System', 'Disconnected from server.');
+            };
+        }
+
+        function logEvent(tag, msg) {
+            const feed = document.getElementById('log-feed');
+            const entry = document.createElement('div');
+            entry.innerHTML = `<span class="text-indigo-400">[${tag}]</span> ${msg}`;
+            feed.appendChild(entry);
+            feed.scrollTop = feed.scrollHeight;
+        }
+
+        function updateNodeStatus(taskId, status) {
+            let color = { background: '#1e293b', border: '#475569' };
+            if (status === 'RUNNING') color = { background: '#0284c7', border: '#38bdf8' };
+            if (status === 'COMPLETED') color = { background: '#15803d', border: '#4ade80' };
+            if (status === 'FAILED') color = { background: '#b91c1c', border: '#f87171' };
+
+            nodesDataset.update({ id: taskId, color: color });
+        }
+
+        async function submitSampleWorkflow() {
+            const sampleDAG = {
+                id: "batman-investigation-" + Date.now(),
+                nodes: [
+                    { id: "fetch-news", agent: "researcher", dependencies: [] },
+                    { id: "analyze-patterns", agent: "analyst", dependencies: ["fetch-news"] },
+                    { id: "generate-report", agent: "writer", dependencies: ["analyze-patterns"] }
+                ]
+            };
+
+            // Populate Vis.js nodes and edges
+            nodesDataset.clear();
+            edgesDataset.clear();
+
+            sampleDAG.nodes.forEach(n => {
+                nodesDataset.add({ id: n.id, label: `${n.id}\n(${n.agent})` });
+                n.dependencies.forEach(dep => {
+                    edgesDataset.add({ from: dep, to: n.id });
+                });
+            });
+
+            try {
+                const res = await fetch('http://localhost:8000/workflows/submit', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(sampleDAG)
+                });
+                const data = await res.json();
+                logEvent('Workflow', `Submitted workflow ${data.workflow_id}. Execution plan: ${data.execution_plan.join(' -> ')}`);
+            } catch (err) {
+                logEvent('Error', 'Failed to submit workflow. Is backend running?');
+            }
+        }
+
+        window.onload = initNetwork;
+    </script>
+</body>
+</html>
