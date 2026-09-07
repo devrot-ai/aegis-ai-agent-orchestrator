@@ -21,15 +21,15 @@
         <header class="flex justify-between items-center border-b border-slate-800 pb-4">
             <div>
                 <h1 class="text-3xl font-bold text-indigo-400">🛡️ Aegis Orchestrator</h1>
-                <p class="text-sm text-slate-400">Distributed Multi-Agent Task Execution & Self-Healing Console</p>
+                <p class="text-sm text-slate-400">Distributed Multi-Agent Task Execution & Self-Healing Console (Live Demo)</p>
             </div>
             <div class="flex items-center space-x-3">
-                <span id="status-badge" class="px-3 py-1 bg-red-900/50 text-red-400 text-xs font-semibold rounded-full border border-red-700">
-                    Disconnected
+                <span id="status-badge" class="px-3 py-1 bg-emerald-900/50 text-emerald-400 text-xs font-semibold rounded-full border border-emerald-700">
+                    Client Simulation Active
                 </span>
-                <button onclick="connectWebSocket()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm font-medium transition">
-                    Connect Telemetry
-                </button>
+                <a href="https://github.com/devrot-ai/aegis-ai-agent-orchestrator" target="_blank" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm font-medium transition border border-slate-700">
+                    GitHub Repository
+                </a>
             </div>
         </header>
 
@@ -49,8 +49,8 @@
                 <!-- Control Card -->
                 <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 space-y-3">
                     <h2 class="text-lg font-semibold text-slate-200">Trigger Sample Workflow</h2>
-                    <p class="text-xs text-slate-400">Submits a multi-node research DAG to the Aegis engine.</p>
-                    <button onclick="submitSampleWorkflow()" class="w-full py-2 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-sm font-semibold transition">
+                    <p class="text-xs text-slate-400">Runs multi-node research DAG with simulated worker execution & self-healing.</p>
+                    <button onclick="runSimulationWorkflow()" class="w-full py-2 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-sm font-semibold transition">
                         ⚡ Run "Gotham Investigation" DAG
                     </button>
                 </div>
@@ -59,7 +59,7 @@
                 <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 space-y-3">
                     <h2 class="text-lg font-semibold text-slate-200">Live Event Feed</h2>
                     <div id="log-feed" class="h-64 overflow-y-auto font-mono text-xs p-3 bg-slate-950 rounded-lg space-y-1 border border-slate-900 text-slate-300">
-                        <div class="text-slate-500">[System] Initialized. Waiting for telemetry connection...</div>
+                        <div class="text-slate-500">[System] Initialized simulation environment. Ready to execute workflows.</div>
                     </div>
                 </div>
             </div>
@@ -67,7 +67,6 @@
     </div>
 
     <script>
-        let ws;
         let network;
         let nodesDataset = new vis.DataSet([]);
         let edgesDataset = new vis.DataSet([]);
@@ -94,33 +93,24 @@
                 }
             };
             network = new vis.Network(container, data, options);
+            
+            // Load initial sample graph
+            loadInitialGraph();
         }
 
-        function connectWebSocket() {
-            ws = new WebSocket('ws://localhost:8000/ws/telemetry');
+        function loadInitialGraph() {
+            nodesDataset.clear();
+            edgesDataset.clear();
 
-            ws.onopen = () => {
-                const badge = document.getElementById('status-badge');
-                badge.className = 'px-3 py-1 bg-emerald-900/50 text-emerald-400 text-xs font-semibold rounded-full border border-emerald-700';
-                badge.innerText = 'Live Telemetry Active';
-                logEvent('System', 'Connected to WebSocket server.');
-            };
+            const initialNodes = [
+                { id: "fetch-news", label: "fetch-news\n(researcher)" },
+                { id: "analyze-patterns", label: "analyze-patterns\n(analyst)" },
+                { id: "generate-report", label: "generate-report\n(writer)" }
+            ];
 
-            ws.onmessage = (event) => {
-                const message = JSON.parse(event.data);
-                logEvent(message.event, JSON.stringify(message.data));
-                
-                if (message.event === 'TASK_STATUS') {
-                    updateNodeStatus(message.data.task_id, message.data.status);
-                }
-            };
-
-            ws.onclose = () => {
-                const badge = document.getElementById('status-badge');
-                badge.className = 'px-3 py-1 bg-red-900/50 text-red-400 text-xs font-semibold rounded-full border border-red-700';
-                badge.innerText = 'Disconnected';
-                logEvent('System', 'Disconnected from server.');
-            };
+            initialNodes.forEach(n => nodesDataset.add(n));
+            edgesDataset.add({ from: "fetch-news", to: "analyze-patterns" });
+            edgesDataset.add({ from: "analyze-patterns", to: "generate-report" });
         }
 
         function logEvent(tag, msg) {
@@ -140,38 +130,26 @@
             nodesDataset.update({ id: taskId, color: color });
         }
 
-        async function submitSampleWorkflow() {
-            const sampleDAG = {
-                id: "batman-investigation-" + Date.now(),
-                nodes: [
-                    { id: "fetch-news", agent: "researcher", dependencies: [] },
-                    { id: "analyze-patterns", agent: "analyst", dependencies: ["fetch-news"] },
-                    { id: "generate-report", agent: "writer", dependencies: ["analyze-patterns"] }
-                ]
-            };
+        async function runSimulationWorkflow() {
+            loadInitialGraph();
+            const workflowId = "batman-investigation-" + Date.now();
+            logEvent('Workflow', `Submitted workflow ${workflowId}. Execution plan: fetch-news -> analyze-patterns -> generate-report`);
 
-            // Populate Vis.js nodes and edges
-            nodesDataset.clear();
-            edgesDataset.clear();
+            const tasks = ["fetch-news", "analyze-patterns", "generate-report"];
 
-            sampleDAG.nodes.forEach(n => {
-                nodesDataset.add({ id: n.id, label: `${n.id}\n(${n.agent})` });
-                n.dependencies.forEach(dep => {
-                    edgesDataset.add({ from: dep, to: n.id });
-                });
-            });
+            for (const taskId of tasks) {
+                // RUNNING
+                updateNodeStatus(taskId, 'RUNNING');
+                logEvent('TASK_STATUS', JSON.stringify({ workflow_id: workflowId, task_id: taskId, status: 'RUNNING' }));
+                await new Promise(r => setTimeout(r, 900));
 
-            try {
-                const res = await fetch('http://localhost:8000/workflows/submit', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(sampleDAG)
-                });
-                const data = await res.json();
-                logEvent('Workflow', `Submitted workflow ${data.workflow_id}. Execution plan: ${data.execution_plan.join(' -> ')}`);
-            } catch (err) {
-                logEvent('Error', 'Failed to submit workflow. Is backend running?');
+                // COMPLETED
+                updateNodeStatus(taskId, 'COMPLETED');
+                logEvent('TASK_STATUS', JSON.stringify({ workflow_id: workflowId, task_id: taskId, status: 'COMPLETED', result: { status: 'success' } }));
+                await new Promise(r => setTimeout(r, 400));
             }
+
+            logEvent('Workflow', `Workflow ${workflowId} completed successfully! All DAG nodes executed and verified.`);
         }
 
         window.onload = initNetwork;
