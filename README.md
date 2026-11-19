@@ -1,29 +1,26 @@
 # Aegis AI Agent Orchestrator
 
-A distributed multi-agent task execution engine with dynamic DAGs and self-healing capabilities, designed to showcase advanced engineering skills for technical interviews.
+A tool that lets you chain together different AI agents so they work on tasks in order, like an assembly line. If one agent fails, the system tries again on its own.
 
-## 🌐 Live Interactive Demo
-👉 **[Try the Live Web Dashboard Demo](https://devrot-ai.github.io/aegis-ai-agent-orchestrator/)**
+## Try It Live
 
-## Overview
-Aegis is a production-grade distributed system that demonstrates mastery of:
-- Distributed systems engineering
-- Real-time monitoring and visualization  
-- Fault tolerance and self-healing capabilities
-- Complex workflow orchestration
-- Modern web technologies integration
+You can see it working right now in your browser: [Live Dashboard Demo](https://devrot-ai.github.io/aegis-ai-agent-orchestrator/)
 
-## Key Features
+## What It Does
 
-- **Dynamic DAG Execution**: Build and execute complex workflows with dynamic task dependencies
-- **Self-Healing Capabilities**: Automatic fault detection and recovery with transactional rollback
-- **Real-time Monitoring**: WebSocket-based live telemetry with interactive Vis.js dashboard
-- **Multi-Agent Support**: Register and execute custom agent handlers with retry mechanisms
-- **Production-Grade Architecture**: Designed for scalability and reliability
+Imagine you have a big task that needs several steps. Maybe step one is research, step two is analysis, and step three is writing a report. Aegis takes care of running each step in the right order. It watches everything happen in real time on a dashboard. And if something breaks, it tries to fix itself.
 
-## Usage
+Built with FastAPI on the backend and a React dashboard on the frontend, connected through WebSockets so you see updates as they happen.
 
-### Submit a Workflow (Local Backend)
+## How to Use
+
+Start the server first:
+
+```bash
+python -m uvicorn projects.aegis.core.main:app --host 127.0.0.1 --port 8000
+```
+
+Then send it a workflow. For example, a three-step task where each step depends on the one before:
 
 ```bash
 curl -X POST http://localhost:8000/workflows/submit \
@@ -35,30 +32,29 @@ curl -X POST http://localhost:8000/workflows/submit \
   ]}'
 ```
 
-## Technical Architecture
-
-```
-Frontend (React + Vis.js) ← WebSocket → Backend (FastAPI)
-                                        ↓
-                                    Agent Workers
-```
-
-## Repository Information
-
-**GitHub**: [kanishkthakur24/aegis-ai-agent-orchestrator](https://github.com/devrot-ai/aegis-ai-agent-orchestrator)
-**Live Dashboard Demo**: [https://devrot-ai.github.io/aegis-ai-agent-orchestrator/](https://devrot-ai.github.io/aegis-ai-agent-orchestrator/)
+The researcher runs first. Once it finishes, the analyst picks up. Then the writer creates the final output.
 
 ## Getting Started
 
-### Prerequisites
+You need Python 3.11 or newer. Install the dependencies:
 
 ```bash
-python 3.11+
 pip install fastapi uvicorn pydantic networkx websockets
 ```
 
-### Run the Backend Server
+Then run the server command shown above and open the dashboard in your browser.
 
-```bash
-python -m uvicorn projects.aegis.core.main:app --host 127.0.0.1 --port 8000
+## How It Works
+
 ```
+Dashboard (React) ← live updates → Server (FastAPI)
+                                    ↓
+                              Agent Workers
+```
+
+The dashboard talks to the server through WebSockets. The server hands off work to different agents. Each agent does its job and reports back.
+
+## Links
+
+- [GitHub Repository](https://github.com/devrot-ai/aegis-ai-agent-orchestrator)
+- [Live Dashboard](https://devrot-ai.github.io/aegis-ai-agent-orchestrator/)
